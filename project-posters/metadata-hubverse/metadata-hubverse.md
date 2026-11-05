@@ -54,7 +54,7 @@ Most of each row can be filled automatically. The admin is asked only for what t
 - **Closing concrete usability gaps.** Harry's analysis names three: the language describing **models**, the language describing **targets** (and, more broadly, the columns), and the **permanence of results** (stable identifiers for a hub's data).
 - **Actively requested by hub admins and the community.** In [hubverse discussion #40](https://github.com/orgs/hubverse-org/discussions/40) several maintainers (Harry, Anna, Sam Abbott, Kath Sherratt, CyGei and others) ask for exactly this: machine-readable (JSON-LD) hub metadata, structured metadata and best-practice reporting standards, standardized target naming and ontologies so targets are comparable across hubs, and per-model **model cards** (HuggingFace-style) describing how each model works.
 - **Metadata at the point of access.** Descriptions, units and provenance are most valuable where people meet the data, not buried in a file. As with a web service where metadata is reviewed before data is pulled, anyone coming to a hub should be able to review the data dictionary and dataset description first.
-- **Harmonisation across hubs, and meta-analysis.** Values linked to shared URIs make data from different hubs comparable and poolable. Their quality also depends on tying each model output row to the precise metadata of its round, modeling task and target.
+- **Harmonisation across hubs, and meta-analysis.** Values linked to shared URIs make data from different hubs comparable and poolable. Their quality also depends on tying each model output row to the precise metadata of its round, target and output type.
 
 ![Two hubs with different target names share one MIDAS term, so a cross-hub query finds both](phase3-crosshub.svg)
 
@@ -250,7 +250,7 @@ A slice of a `model-output` record. Illustrative and simplified; URIs are exampl
 - **Enrich the dataset-level record:** a suggested license from the per-model licenses, temporal and geographic coverage, and **model cards** rendered from model-metadata.
 - **Persistent identifiers:** a workflow that mints DOIs from the hub, so the hub owner opts in rather than minting by hand.
 - **Provenance:** the upstream source of target data, recorded once. Modelers get documentation and a lookup of common data sources for their models' `data_inputs`.
-- **Row-level metadata in collected data.** Collected model output carries the metadata of each row's round, modeling task and target, building on the stamping in the [`model_out_tbl` subclasses poster](https://github.com/reichlab/decisions/pull/39).
+- **Row-level metadata in collected data.** Collected model output carries the metadata of each row's round, target and output type, building on the stamping in the [`model_out_tbl` subclasses poster](https://github.com/reichlab/decisions/pull/39).
 - **FAIR self-assessment:** a report of what each hub has against the standard, with a maturity score, alongside external assessment with [F-UJI](https://www.f-uji.net/).
 - **Metadata where people access data:** in `hubData` and the Python client, on the dashboards, and optionally in the viewers or as reusable web widgets in a recognisably hubverse style.
 
