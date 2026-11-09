@@ -141,6 +141,29 @@ hub_con |>
   as_model_out_pmf()   # ordinal: output_type_id_order read from the stamped attribute
 ```
 
+The attribute, sketched for one config round (names illustrative). `round_id_col` names the column that holds every row's round ID, and `round_ids` holds every round ID the config round covers. Each row of `targets` is one target and output type. `mt_idx` lists the modeling tasks the entry was read from, and the value columns are `NULL` where they do not apply:
+
+```r
+attr(x, "config_values")
+#> $round_id_col
+#> [1] "origin_date"
+#>
+#> $rounds
+#>   round_idx round_ids  targets
+#>       <int> <list>     <list>
+#> 1         1 <chr [12]> <tibble [3 × 7]>
+
+attr(x, "config_values")$rounds$targets[[1]]
+#>   target   output_type mt_idx    discriminator target_metadata  compound_taskid_set output_type_id_order
+#>   inc hosp quantile    <int [2]> <NULL>        <named list [8]> <NULL>              <NULL>
+#>   inc hosp sample      <int [2]> <NULL>        <named list [8]> <chr [2]>           <NULL>
+#>   flu cat  pmf         <int [1]> <NULL>        <named list [8]> <NULL>              <chr [4]>
+```
+
+A row with `origin_date` in that round's `round_ids`, target `flu cat` and output type `pmf` takes the `output_type_id_order` in the last line. Its `target_metadata` gives plots and print methods the target's name and units, and whether the target is step-ahead.
+
+`discriminator` is `NULL` unless one target and output type map to modeling tasks that declare different values, for example a national and a state `sample` modeling task with different `compound_taskid_set`s. That key then has one entry per modeling task, and `discriminator` holds the values of the task IDs that tell them apart, such as `list(location = "US")`. Rows of that key are also matched on those task IDs. The full shape is set out in hubUtils [#310](https://github.com/hubverse-org/hubUtils/issues/310).
+
 A stamped attribute is a default the caller can override, not the record of truth. Where it is absent, because the data did not come through `collect_hub()`, coercion to `model_out_tbl` failed or `summarise()` dropped it, or where a row matches none of its entries, the constructor falls back to its arguments and asks for the value where it is needed. Stamping is a further consumer of the extraction, not a dependency of it.
 
 Matching rows to a round needs one column that holds every row's round ID. A round with `round_id_from_variable: false` records its round ID only in the file name. Where a hub's rounds do not all take their round ID from the same task ID, hubData therefore adds a `round_id` column read from the file name ([hubData#167](https://github.com/hubverse-org/hubData/issues/167)). For cloud hubs, the column already exists: hubverse-transform stores `round_id` on every row, and `connect_hub()` only needs to keep it when the hub calls for it. A hub can include `round_id` itself, as a standard task ID.
