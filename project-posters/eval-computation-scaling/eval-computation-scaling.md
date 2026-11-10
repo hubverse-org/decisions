@@ -66,7 +66,7 @@ Loading does not filter rows by entry, so rows from other entries can be silentl
 
 ### What are we _not_ trying to do?
 
-- Add new metrics, output types or transforms. That's [eval-metrics-expansion](https://github.com/reichlab/decisions/blob/ngr/poster/eval-metrics-expansion/project-posters/eval-metrics-expansion/eval-metrics-expansion.md), and this design must accommodate it.
+- Add new metrics, output types or transforms. That's [eval-metrics-expansion](../eval-metrics-expansion/eval-metrics-expansion.md), and this design must accommodate it.
 - Rewrite scoring math. scoringutils stays the reference implementation.
 - Support eval sets that pool rounds from *different* `rounds` entries. This is noted as an open question below, not a goal.
 - Build a general-purpose scoring database for ad hoc analysis. The store is an internal cache for dashboard builds, although it may turn out useful for that too.
