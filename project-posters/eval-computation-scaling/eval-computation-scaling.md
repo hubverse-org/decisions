@@ -22,11 +22,16 @@ Redesigning how hubverse evaluation scores are computed for the predevals dashbo
 **Eval builds are hitting memory and time limits on real hubs.**
 
 - The Reich Lab forecast sandbox (about 80 models, 2 targets, 12 eval sets) takes 2.5–3.5 h and peaks at 36 GB. The nightly "Rebuild Data" eval job has been killed for running out of memory (exit 137) on GitHub runners every night since 2026-10-13. We now build it by hand on the UMass Unity cluster, and the nightly workflow is disabled.
-- The FluSight forecast hub has about the same amount of data per season as the sandbox (see below). Its eval build currently takes about 40 min and about 9 GB ([hubPredEvalsData#80](https://github.com/hubverse-org/hubPredEvalsData/issues/80)). It is one config change, or one season of growth, away from the same wall: 2026-27 already has 89 models after 5 rounds, vs 68 in all of 2025-26.
+- The FluSight forecast hub has about the same amount of data per season as the sandbox (see below). Its eval build currently takes about 40 min and about 9 GB ([hubPredEvalsData#80](https://github.com/hubverse-org/hubPredEvalsData/issues/80)). This is a more prominent hub and any slowdown or complete issues here would be a larger problem than one on the sandbox.
 
 **Why it's slow and big.** A [memory profile of the sandbox build](memory-profile.md) shows:
 
-- **Peak memory is set by the single largest eval set.** The "three seasons, state level" set pools 17.0M quantile rows into one `hubEvals::score_model_out()` call. Every other eval set peaks at 18 GB or less.
+- **Peak memory is the largest eval set's working memory *plus* memory left over from earlier calls.**
+  - The "three seasons, state level" set pools 17.0M quantile rows into one `hubEvals::score_model_out()` call, which needs about 26 GB on its own.
+  - After that call returns, the R process does not give its memory back to the operating system: it stays at about 12 GB even though the live data are about 2.5 GB.
+  - Every later call starts from that higher baseline, so the same work peaks 4–7 GB higher (28–32 GB), and the whole run peaks at 36 GB.
+  - The baseline levels off (11.5–13 GB for the rest of the run) rather than growing without limit. But because of it, the order of eval sets matters: a big eval set that runs late inherits the memory left by every set before it.
+  - Every other eval set peaks at 18 GB or less, mostly that retained baseline.
 - **Within one call, the data are copied and reshaped many times:**
 
   | stage | memory | time |
@@ -36,7 +41,7 @@ Redesigning how hubverse evaluation scores are computed for the predevals dashbo
   | `score()` (each metric reshapes the data again) | peaks at 26 GB | about 425 s |
   | relative skill + summary | | about 10 s |
 
-- **The same work is repeated 5× per eval set**, once for the overall scores and once per disaggregation (location, reference_date, horizon, target_end_date). The R process keeps about 12 GB between calls, so the later calls peak at 28–32 GB.
+- **The same work is repeated 5× per eval set**, once for the overall scores and once per disaggregation (location, reference_date, horizon, target_end_date). Each repeat starts from the retained baseline above.
 - **Every run rescores everything,** including seasons that closed years ago.
 
 **Sandbox vs FluSight: same data, different eval sets.**
@@ -66,7 +71,7 @@ Loading does not filter rows by entry, so rows from other entries can be silentl
 
 ### What are we _not_ trying to do?
 
-- Add new metrics, output types or transforms. That's [eval-metrics-expansion](../eval-metrics-expansion/eval-metrics-expansion.md), and this design must accommodate it.
+- Add new metrics, output types or transforms.
 - Rewrite scoring math. scoringutils stays the reference implementation.
 - Support eval sets that pool rounds from *different* `rounds` entries. This is noted as an open question below, not a goal.
 - Build a general-purpose scoring database for ad hoc analysis. The store is an internal cache for dashboard builds, although it may turn out useful for that too.
@@ -83,6 +88,9 @@ Loading does not filter rows by entry, so rows from other entries can be silentl
 
 1. **Incremental fixes to the current design** (in flight): load once and score once per eval set ([hubPredEvalsData#80](https://github.com/hubverse-org/hubPredEvalsData/issues/80), [#83](https://github.com/hubverse-org/hubPredEvalsData/issues/83), [#89](https://github.com/hubverse-org/hubPredEvalsData/issues/89)), plus upstream speedups. This cuts the time by about 5×, but the peak still grows with the size of the largest eval set.
 2. **Round-chunked scoring with a stored per-forecast score store, updated incrementally** (proposed below). This makes memory independent of eval set size and rescores only what changed.
+   - **Caveat:** relative skill can't be updated incrementally. It compares every model against the others across the whole eval set, so any change to a round in an eval set means recomputing that eval set's relative skill and summaries.
+   - **What makes it worthwhile:** that recomputation runs on the stored per-forecast scores (about 1 row per forecast per scale), not on the quantile rows. For the largest sandbox eval set, relative skill took 8–18 s per disaggregation in the profile, vs about 14 min to rescore the quantile rows.
+   - **Net effect:** a change triggers (a) rescoring of the affected round chunks only, and (b) re-summarising of every eval set that contains them. Eval sets for closed seasons are skipped entirely unless their data change.
 3. **A faster scoring kernel** that computes WIS and coverage from one n × Q quantile matrix ([scoringutils#1237](https://github.com/epiforecasts/scoringutils/issues/1237)). It complements 1 and 2 by cutting the cost per row.
 4. **Moving scoring into duckdb/arrow SQL over parquet.** This scales furthest, but it is a second implementation of the scoring rules and departs from the R-maintainable precompute in the [eval dashboard LDR](../../decisions/2024-12-13-ldr-eval-dashboard-structure.md).
 5. **Bigger machines** (larger or self-hosted runners, a cluster). This is a stopgap; self-hosted runners conflict with the [GitHub Action security RFC](../../decisions/2025-02-13-rfc-github-action-security.md).
@@ -134,7 +142,7 @@ flowchart LR
   T --> S[score]
   S --> R[relative skill +<br/>summarise]
   R --> C[scores.csv]
-  C -. repeated 5× per eval set,<br/>every eval set, every night .-> L
+  C -. repeated 5× per eval set .-> L
 ```
 
 **Proposed:**
@@ -158,8 +166,17 @@ flowchart LR
 - Peak memory follows the chunk size, about 260k rows for a current sandbox round vs 17M in one call today, regardless of how many seasons an eval set pools.
 
 **2. Per-forecast score store and manifest.**
-- Scores are stored as parquet partitioned by target and round. Key: `round_id` + task IDs + `model_id` + `scale`.
-- A manifest has one row per chunk, recording the chunk's input fingerprints and when it was scored.
+- **Score store:** scores are stored as parquet partitioned by target and round. Key: `round_id` + task IDs + `model_id` + `scale`.
+- **Manifest:** a small table, saved next to the store, that records *what inputs each stored chunk was computed from*. It is the build's memory of the previous run. It has one row per chunk (target × `round_id`), for example:
+
+  | target_id | round_id | rounds_entry | model_output_hash | oracle_hash | settings_hash | n_forecasts | scored_at |
+  |---|---|---|---|---|---|---|---|
+  | wk inc flu hosp | 2025-12-13 | 0 | `3f9a…` | `b21c…` | `77e0…` | 11,648 | 2026-11-10T03:12Z |
+
+  - `model_output_hash` is a hash of the sorted list of (file path, git blob SHA) for every model-output file in that round. Adding, removing or changing any file changes it.
+  - `oracle_hash` is a hash of the oracle rows the round's forecasts join to.
+  - `settings_hash` is a hash of the metrics, transform and package versions.
+  - The manifest holds no scores, just a few hundred rows for a hub with several seasons. It's what lets a run decide which chunks to rescore without reading the stored scores or the hub's git history.
 
 **3. Change detection: score only when inputs change.** Each run computes fingerprints per chunk and rescores the chunks whose fingerprints differ from the manifest:
 - **model output:** git blob SHAs of the round's model-output files, from `git ls-tree`. This is a content hash that needs no file reads.
@@ -201,8 +218,7 @@ Delivered as mini-sprints. Sprints A and D are independent; B depends on A; C de
 | D | eval sets per `rounds` entry (schema v1.2.0) | new hubPredEvalsData issue; follows [#26](https://github.com/hubverse-org/hubPredEvalsData/issues/26) | test hub with two entries; docs' PredEvals limitations updated |
 | E | optional kernel speedups upstream | [scoringutils#1236](https://github.com/epiforecasts/scoringutils/issues/1236), [#1237](https://github.com/epiforecasts/scoringutils/issues/1237), [#1220](https://github.com/epiforecasts/scoringutils/issues/1220) | merged upstream; picked up in hubEvals |
 
-- **Team size:** 1–2 developers for A–D, plus coordination with the epiforecasts maintainers for E.
-- **Delivery:** ideally A–C before the peak of the 2026-27 flu season, so the sandbox and FluSight dashboards keep building nightly.
+- **Delivery:** ideally A–C before the peak of the 2026-27 flu season
 - **Risks:**
   - the store's location and permissions in the control room;
   - getting cache invalidation right (mitigated by the periodic full-rebuild check);
