@@ -12,6 +12,7 @@ Terms are used as the poster defines them in [Key terms](sample-ids.md#key-terms
 - [Mixed coarseness within a modeling task](#mixed-coarseness-within-a-modeling-task)
 - [Hash settings](#hash-settings)
 - [Integer-ID hubs](#integer-id-hubs)
+- [Errors in the data](#errors-in-the-data)
 - [Samples shared across modeling tasks](#samples-shared-across-modeling-tasks)
 
 ## Functions
@@ -112,6 +113,16 @@ Until a hub sets `sample_id_hash`, teams that generate IDs need the hub's `max_l
 ## Integer-ID hubs
 
 Integer sample IDs are recast to character IDs in the new format by `create_hub_spl_ids()`, in `collect_hub()` when asked to or as a separate step on a `model_out_tbl`. Recasting uses the hub's hash setting where there is one, and the function defaults otherwise, unless the caller overrides them. IDs recast with the defaults are reproducible; IDs recast with overrides are not, unless the overrides are shared.
+
+## Errors in the data
+
+IDs are hashed from task ID values, so errors in those values affect the IDs. Errors in the `value` column do not.
+
+- **A value the config does not allow.** The row matches no modeling task, so `create_hub_spl_ids()` cannot tell its set or `<mt>`, and errors on it. Rows outside a `subset` are different: they are returned unchanged.
+- **A value fixed after IDs were generated.** The IDs no longer match their rows. A new validation check recomputes each ID from its rows and the config, and fails with a message to regenerate the IDs.
+- **A valid but wrong value**, such as a row given location `02` that belongs to a sample in `01`. The sample looks coarser than the set and is split, leaving a one-row sample in `02`. The existing sample checks reject it, because it does not cover the required values of the task IDs outside the set.
+
+The submission template is generated from the config, so its values are valid and its IDs correct. Errors start only when a team edits task ID values in a filled-in template, which the recomputing check catches.
 
 ## Samples shared across modeling tasks
 
