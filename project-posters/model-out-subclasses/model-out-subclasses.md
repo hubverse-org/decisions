@@ -141,10 +141,10 @@ hub_con |>
   as_model_out_pmf()   # ordinal: output_type_id_order read from the stamped attribute
 ```
 
-The attribute, sketched for one config round (names illustrative). `round_id_col` names the column that holds every row's round ID, and `round_ids` holds every round ID the config round covers. Each row of `targets` is one target and output type. `mt_idx` lists the modeling tasks the entry was read from, and the value columns are `NULL` where they do not apply:
+The attribute is named `hub_meta` and is read with the `hub_meta()` generic. It is sketched here for one config round. `round_id_col` names the column that holds every row's round ID, and `round_ids` holds every round ID the config round covers. Each row of `targets` is one target and output type. `mt_idx` lists the modeling tasks the entry was read from, and the value columns are `NULL` where they do not apply:
 
 ```r
-attr(x, "config_values")
+hub_meta(x)
 #> $round_id_col
 #> [1] "origin_date"
 #>
@@ -153,7 +153,7 @@ attr(x, "config_values")
 #>       <int> <list>     <list>
 #> 1         1 <chr [12]> <tibble [3 × 7]>
 
-attr(x, "config_values")$rounds$targets[[1]]
+hub_meta(x)$rounds$targets[[1]]
 #>   target   output_type mt_idx    discriminator target_metadata  compound_taskid_set output_type_id_order
 #>   inc hosp quantile    <int [2]> <NULL>        <named list [8]> <NULL>              <NULL>
 #>   inc hosp sample      <int [2]> <NULL>        <named list [8]> <chr [2]>           <NULL>
