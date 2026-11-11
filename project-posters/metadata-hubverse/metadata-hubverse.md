@@ -250,7 +250,7 @@ A slice of a `model-output` record. Illustrative and simplified; URIs are exampl
 - **Enrich the dataset-level record:** a suggested license from the per-model licenses, temporal and geographic coverage, and **model cards** rendered from model-metadata.
 - **Persistent identifiers:** a workflow that mints DOIs from the hub, so the hub owner opts in rather than minting by hand.
 - **Provenance:** the upstream source of target data, recorded once. Modelers get documentation and a lookup of common data sources for their models' `data_inputs`.
-- **Row-level metadata in collected data.** Collected model output carries the metadata of each row's round, target and output type, building on the stamping in the [`model_out_tbl` subclasses poster](https://github.com/reichlab/decisions/pull/39).
+- **Row-level metadata in collected data.** Collected model output carries the metadata of each row's round, target and output type, building on the stamping in the [`model_out_tbl` subclasses poster](https://github.com/reichlab/decisions/pull/39). The metadata is attached as a `hub_meta` attribute.
 - **FAIR self-assessment:** a report of what each hub has against the standard, with a maturity score, alongside external assessment with [F-UJI](https://www.f-uji.net/).
 - **Metadata where people access data:** in `hubData` and the Python client, on the dashboards, and optionally in the viewers or as reusable web widgets in a recognisably hubverse style.
 
