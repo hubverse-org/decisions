@@ -32,7 +32,7 @@ The hash identifies the context the sample was drawn in, down to its compound un
 - **Preparing a submission:** teams generate IDs for their samples instead of numbering them by hand, or start from a template of correctly structured samples generated from the hub config.
 - **Collecting data:** collected model output can be given IDs in the new format, whatever IDs were submitted, including integer IDs. This standardises the samples to one compound task ID set per modeling task across the dataset. The set is the configured one by default, read from the hub config or from the values stamped on collected data (see below), and can be overridden with a coarser one. Samples coarser than the set are split to it, and dependence beyond the set is dropped.
 - **Ensembling and scoring:** combined model output gets IDs that are unique across models and rounds, split to the compound task ID set the method needs.
-- **Casting to the sample subclass:** possibly, the sample subclass of `model_out_tbl` ([subclasses poster](../model-out-subclasses/model-out-subclasses.md)) gets IDs in the new format when it is constructed. This likewise standardises the samples to one compound task ID set per modeling task, by default the configured one stamped on collected data ([stamping](../model-out-subclasses/model-out-subclasses.md#populating-config-derived-values), hubUtils [#310](https://github.com/hubverse-org/hubUtils/issues/310)), or a coarser one given to the constructor.
+- **Casting to the sample subclass:** the sample subclass of `model_out_tbl` ([subclasses poster](../model-out-subclasses/model-out-subclasses.md)) can give samples IDs in the new format when it is constructed, for data not recast at collection. It uses the same generator and the values stamped on collected data ([stamping](../model-out-subclasses/model-out-subclasses.md#populating-config-derived-values), hubUtils [#310](https://github.com/hubverse-org/hubUtils/issues/310)), so the IDs are the ones recasting at collection would give. The set is the configured one by default, or a coarser one given to the constructor, which is accepted when no sample is finer than it.
 
 ### Key terms
 
@@ -199,7 +199,7 @@ schemas / hubAdmin
 consumers
   ├── hubData: opt-in recasting in collect_hub(), using the set stamped by hubUtils #310
   ├── hubEnsembles, hubEvals: recast, or set as argument, before ensembling or scoring
-  └── hubUtils subclasses: possibly recast in as_model_out_sample()
+  └── hubUtils subclasses: opt-in recasting in as_model_out_sample(), using hub_meta
 ```
 
 ### Scale and scope
