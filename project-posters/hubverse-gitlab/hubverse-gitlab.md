@@ -12,13 +12,12 @@
 
 ### What are we doing?
 
-Make the hubverse CI tooling usable by a hub hosted on GitLab, and establish whether the hubverse dashboard can be built and served from GitLab too. Today both depend strictly on github.com. The immediate driver is ACEFA, whose hub runs on a university GitLab instance and who have offered to do the porting work with us.
+Make the hubverse CI tooling usable by a hub hosted on GitLab. Today it depends strictly on github.com. The immediate driver is ACEFA, whose hub runs on a university GitLab instance and who have offered to do the porting work with us.
 
-The work has three strands:
+The work has two strands:
 
 1. **A GitLab port of the hubverse CI workflows.** The validation workflows in [hubverse-actions](https://github.com/hubverse-org/hubverse-actions) (config, submission and target data validation, with the merge request comment that reports results) rewritten as GitLab CI pipelines, merged upstream and maintained as part of the hubverse.
 2. **Hosting and distribution.** A place to keep, version and test the GitLab pipelines, and a way for a hub on a self-managed GitLab instance to install them.
-3. **The dashboard on GitLab.** Whether the existing dashboard build tools can run as a GitLab pipeline and publish to GitLab Pages with access restricted to project members. The hubverse team scopes it in a project poster of its own before any commitment. ACEFA has no near-term need for it, so the scoping is not tied to their timeline.
 
 ### Why are we doing this?
 
@@ -28,15 +27,13 @@ The work has three strands:
 
 **It removes a single-vendor dependency.** All hubverse CI runs on GitHub Actions and installs third-party actions from the GitHub marketplace. A second forge is a check that the tooling is not coupled to one provider, and GitLab is the forge preferred by a part of the open source community that should be able to use hubverse tools.
 
-**Private dashboards.** The current dashboard publishes to GitHub Pages, which is public. GitLab Pages has access control built in, so a GitLab deployment is a direct route to a dashboard that only hub members can see.
-
 ### What are we _not_ trying to do?
 
+- Not porting functionality that is not core or that no hub has asked for. Each GitLab version is a second copy for the hubverse team to maintain, so the port covers only the validation workflows. The AWS upload workflow (`hubverse-aws-upload`) and the dashboard stay GitHub only until a hub needs them (see Alternatives considered for the dashboard).
 - Not building a general multi-forge abstraction over the CI tooling. The port targets GitLab. GitHub Enterprise Server is out of scope. It runs GitHub Actions, so the existing workflows should largely work there, and any gaps are a separate, smaller piece of work.
 - Not changing what the validation checks do. The R and bash logic in hubValidations and hubverse-actions stays as it is. The port covers the wrapper layer: pipeline YAML, the merge request comment, and the few places where our code calls the GitHub API or relies on GitHub runner conveniences.
-- Not solving institutional access administration. Onboarding external collaborators onto an institutional GitLab instance, and granting them access to a restricted Pages site, is for the hosting institution to manage. It can be a significant administrative load, and a hub admin should plan for it.
+- Not solving institutional access administration. Onboarding external collaborators onto an institutional GitLab instance is for the hosting institution to manage. It can be a significant administrative load, and a hub admin should plan for it.
 - Not addressing cloud storage. Mirroring hub data to S3 for a hub with data residency requirements is a separate piece of work. A regional bucket in the hubverse account with cross-account roles, as suggested by AWS, is one candidate design, and a GitLab hub would need a non-GitHub route to assume the role in any case.
-- Not porting the AWS upload workflow (`hubverse-aws-upload`) in the first phase. It depends on GitHub OIDC trust set up in hubverse-infrastructure, and the hubs asking for GitLab do not use it.
 
 ### How do we judge success?
 
@@ -46,7 +43,6 @@ The work has three strands:
 - The port is not specific to ACEFA. A hub whose instance cannot reach the internet, and can only mirror, can install it by following the documented mirroring route.
 - The port is maintained by the hubverse, versioned and released alongside the GitHub workflows, and is not a fork maintained by one hub.
 - Changes to shared R code made for the port (hubValidations) are forge neutral and do not degrade the GitHub path.
-- The dashboard strand ends in a project poster that either proposes a GitLab Pages deployment or records why not to pursue one.
 
 ### What are possible solutions?
 
@@ -105,10 +101,6 @@ Note that a hub whose runners cannot reach a package repository can instead buil
 
 `validate_pr()` and `validate_target_pr()` in hubValidations list changed files through the GitHub API. `git diff --name-status` against the target branch reports the same file name and status (added, modified, removed, renamed) on any forge, with no API or token. A GitLab merge request pipeline runs on the source branch and exposes the merge base SHA, so no fetch is needed when the clone reaches back that far. Both runners clone shallowly by default, so the wrapper may need to fetch the base commit first.
 
-#### Dashboard
-
-The three dashboard build tools (hub-dashboard-predtimechart, hubPredEvalsData via its Docker wrapper, hub-dash-site-builder) are container images or a pip package and run as GitLab jobs as they are. What does not transfer is the control room's orchestration, which is GitHub-specific throughout: a GitHub App token, discovery of dashboards through the app's installations, and pushes of the outputs to branches of each dashboard repository. On GitLab each hub runs its own pipeline that calls the tools and publishes to GitLab Pages with access control.
-
 ## ✅ Validation
 
 ### What do we already know?
@@ -141,15 +133,13 @@ The R and bash scripts are already separate from the action YAML, so the port is
 - A CI/CD component can only be referenced from the same GitLab instance. Using a GitLab.com component on a self-managed instance requires mirroring the component project there.
 - The job token (`CI_JOB_TOKEN`) can read merge request notes but cannot create them. Posting the results comment needs a project access token stored as a CI/CD variable.
 - A merge request pipeline from a fork runs in the fork by default, with the fork's variables. A parent project member can run it in the parent project instead, with the parent's variables, after accepting a warning.
-- GitLab Pages access control is available on self-managed instances once an administrator enables it. A restricted site can be limited to project members, or to any user signed in to the instance. An external user can see it only with a project membership.
 
 **ACEFA's instance** (answers from Ruarai Tobin on the first review).
 
-- GitLab Community Edition 19.4.2, with Pages available.
+- GitLab Community Edition 19.4.2.
 - Runners have full internet access, so templates, packages and images need no mirroring in.
 - Project access tokens can be created by the hub's own administrators.
 - All submitters are members of the hub project.
-- Dashboard JavaScript loaded from a CDN is acceptable. Only the data has to stay on their infrastructure.
 
 ### What do we need to answer?
 
@@ -176,10 +166,6 @@ The pipelines assume submitters are members of the hub project, which is the nor
 
 5. A hubverse group on GitLab.com holding a mirror of the pipelines, the image and test hubs.
 6. A documented installation route for self-managed instances, including mirroring. The include is three lines, so hubCI needs no GitLab support.
-
-**Phase 3: dashboard** (hubverse, scoping first).
-
-7. A project poster for the dashboard on GitLab, scoping what that would entail: how a hub's own pipeline is triggered and kept current without the control room, and how much of it the hubverse team will own given the existing maintenance load (see [2026-03-10 RFC](../../decisions/2026-03-10-RFC-dashboard-release-deployment.md)). That poster is where the decision on if and when to take it on is made.
 
 #### Hosting and distribution
 
@@ -213,6 +199,8 @@ flowchart LR
 
 **GitLab.com as the source of truth (rejected).** Develop and release the pipelines in a hubverse group on GitLab.com, where they run, and publish them as CI/CD components in the catalog. The team would then work across two forges, with the GitLab pipelines released out of step with the GitHub workflows they share scripts with. Institutional instances have to mirror a component project wherever it is published, so the catalog gains them nothing. Testing is the one thing GitLab.com has to provide, and a mirror provides it.
 
+**The dashboard on GitLab Pages (deferred).** GitLab Pages has access control, so a GitLab deployment would give a hub a dashboard that only its members can see. The dashboard build tools are container images or a pip package and would run as GitLab jobs as they are. The control room's orchestration would not transfer, because it is GitHub-specific throughout. Where the dashboard workflow and infrastructure are heading is not yet settled, and ACEFA has no near-term need for it, so porting it is left until a hub needs it.
+
 ### Visualize the solution
 
 Indicative layout of the port inside hubverse-actions (names illustrative):
@@ -240,6 +228,6 @@ hubValidations
 ### Scale and scope
 
 - **Team:** Ruarai Tobin (ACEFA), Anna Krystalli (owner), Matthew Cornell, Nicholas Reich. The split of work is given under Proposed solution.
-- **Repos touched:** hubverse-actions, hubValidations; a hubverse group on GitLab.com; later the dashboard tool repositories if phase 3 proceeds.
-- **Effort:** phase 1 is mostly translation of a small number of workflows and is expected to be modest. Phase 2 is small once phase 1 has settled the layout. Phase 3 is unknown until scoped.
+- **Repos touched:** hubverse-actions, hubValidations; a hubverse group on GitLab.com.
+- **Effort:** phase 1 is mostly translation of a small number of workflows and is expected to be modest. Phase 2 is small once phase 1 has settled the layout.
 - **Delivery date:** none set. Phase 1 is driven by ACEFA's need.
