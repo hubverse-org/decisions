@@ -164,12 +164,17 @@ The pipelines assume submitters are members of the hub project, which is the nor
 
 **Phase 2: hosting and distribution** (hubverse).
 
-5. A hubverse group on GitLab.com holding a mirror of the pipelines, the image and test hubs.
-6. A documented installation route for self-managed instances, including mirroring. The include is three lines, so hubCI needs no GitLab support.
+5. An application to the GitLab for Open Source programme for the `hubverse` group on GitLab.com, to get pull mirroring (see Hosting and distribution).
+6. The `hubverse` group on GitLab.com holding a mirror of the pipelines, the image and test hubs.
+7. A documented installation route for self-managed instances, including mirroring. The include is three lines, so hubCI needs no GitLab support.
 
 #### Hosting and distribution
 
-The GitLab pipelines are developed and released on GitHub, and GitLab.com carries a mirror. GitHub stays the single place for issues, review, versioning and releases, and keeping the GitLab pipelines next to the GitHub workflows they share scripts with avoids drift between them. GitLab CI can only run on GitLab, so a hubverse group on GitLab.com holds a pull mirror of the repository, which GitLab keeps in sync automatically, plus test hubs that exercise the pipelines. Releases and the container image are mirrored the same way. The mirror needs no upkeep once set up, and the group is needed in any case to test the pipelines. A hub whose instance can reach the internet includes the templates from the mirror or straight from the GitHub repository. An instance that cannot mirrors the repository once and its hubs include from that local copy. ACEFA does not need that route, but a hub that can only mirror is one the hubverse wants to support, and a mirror plus instructions for mirroring locally is a cheap way to do it.
+The GitLab pipelines are developed and released on GitHub, and GitLab.com carries a mirror. GitHub stays the single place for issues, review, versioning and releases, and keeping the GitLab pipelines next to the GitHub workflows they share scripts with avoids drift between them. GitLab CI can only run on GitLab, so the `hubverse` group on GitLab.com holds a mirror of the repository, plus test hubs that exercise the pipelines. Releases and the container image are mirrored the same way. The group is needed in any case to test the pipelines.
+
+How the mirror is kept in sync depends on the group's GitLab tier. Pull mirroring, where GitLab fetches from GitHub on a schedule, is a Premium and Ultimate feature. The GitLab for Open Source programme grants Ultimate to qualifying open source projects at no cost, so the preferred route is to apply to it. A pull mirror then needs no upkeep once set up. If the application is not successful, a GitHub workflow in hubverse-actions pushes to GitLab.com on each push and tag instead. Its cost is a GitLab access token stored as a GitHub secret, which has to be renewed before it expires.
+
+A hub whose instance can reach the internet includes the templates from the mirror or straight from the GitHub repository. An instance that cannot copies the repository once and its hubs include from that local copy. Note that on a free-tier instance, such as GitLab Community Edition, that copy is updated by hand or by a scheduled job, because pull mirroring is not available there either. ACEFA does not need that route, but a hub that can only mirror is one the hubverse wants to support, and a mirror plus instructions for mirroring locally is a cheap way to do it.
 
 How the pipelines get from GitHub to a hub:
 
@@ -179,7 +184,7 @@ flowchart LR
     HA["hubverse-actions<br/>GitHub workflows and GitLab pipelines<br/>shared R and bash scripts<br/>issues, review, releases"]
   end
   subgraph glc["GitLab.com: hubverse group"]
-    MIR["hubverse-actions<br/>pull mirror, synced automatically"]
+    MIR["hubverse-actions<br/>mirror, synced from GitHub"]
     TH["test hubs<br/>run the pipelines in CI"]
   end
   subgraph inst["Institutional GitLab instance"]
